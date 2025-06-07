@@ -109,10 +109,10 @@
             {% endfor %}
         </div>
         
-        <form action="/chat/upload" method="post" class="message-form">
-            <input type="text" name="message" class="message-input" placeholder="Type your message..." required>
-            <button type="submit" class="send-button">Send</button>
-        </form>
+        <div class="message-form">
+            <input type="text" id="messageInput" class="message-input" placeholder="Type your message..." required>
+            <button id="sendButton" class="send-button">Send</button>
+        </div>
         
         <div class="nav-buttons">
             <a href="/user/me" class="button">Profile</a>
@@ -121,10 +121,126 @@
     </div>
     
     <script>
-        // Scroll to the bottom of the chat container when the page loads
+        // Get the current username from the server-side template
+        const username = "{{ username }}";
+        
+        // WebSocket connection
+        let ws = null;
+        
+        function connectWebSocket() {
+            // Use secure WebSocket protocol if the page is served over HTTPS
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            
+            // Get the auth token from the page (we would need to pass this from the server)
+            // For testing, we can just use the username as a simple authentication mechanism
+            const wsUrl = `${protocol}//${window.location.host}/ws/${username}`;
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(event) {
+                console.log("Connection established");
+            };
+            
+            ws.onmessage = function(event) {
+                const message = JSON.parse(event.data);
+                
+                // Handle different message types
+                if (!message.type || message.type === 'chat_message') {
+                    addMessageToUI(message);
+                }
+                // We could handle other message types here if needed
+            };
+            
+            ws.onclose = function(event) {
+                console.log("Connection closed");
+                // Try to reconnect in 5 seconds
+                setTimeout(connectWebSocket, 5000);
+            };
+            
+            ws.onerror = function(error) {
+                console.log("WebSocket Error: ", error);
+                ws.close();
+            };
+        }
+        
+        function addMessageToUI(message) {
+            const chatContainer = document.getElementById('chatContainer');
+            const messageDiv = document.createElement('div');
+            
+            // Set class based on sender
+            if (message.sender === username) {
+                messageDiv.className = 'message user';
+                messageDiv.innerHTML = `
+                    <div>${message.content}</div>
+                    <div class="timestamp">${message.timestamp}</div>
+                `;
+            } else {
+                messageDiv.className = 'message other';
+                messageDiv.innerHTML = `
+                    <div><strong>${message.sender}:</strong> ${message.content}</div>
+                    <div class="timestamp">${message.timestamp}</div>
+                `;
+            }
+            
+            chatContainer.appendChild(messageDiv);
+            
+            // Scroll to the bottom
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+        
+        // Initialize WebSocket connection when page loads
         window.onload = function() {
+            // Scroll to the bottom of the chat container
             var chatContainer = document.getElementById('chatContainer');
             chatContainer.scrollTop = chatContainer.scrollHeight;
+            
+            // Connect to WebSocket
+            connectWebSocket();
+            
+            // Set up form submission via WebSocket
+            const messageInput = document.getElementById('messageInput');
+            const sendButton = document.getElementById('sendButton');
+            
+            function sendMessage() {
+                const content = messageInput.value.trim();
+                if (content) {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        // Send through WebSocket
+                        const messageData = {
+                            content: content
+                        };
+                        ws.send(JSON.stringify(messageData));
+                        messageInput.value = '';
+                    } else {
+                        // Fallback to traditional form submission
+                        // Create a form dynamically and submit
+                        const form = document.createElement('form');
+                        form.method = 'POST';
+                        form.action = '/chat/upload';
+                        
+                        const messageField = document.createElement('input');
+                        messageField.type = 'hidden';
+                        messageField.name = 'message';
+                        messageField.value = content;
+                        
+                        form.appendChild(messageField);
+                        document.body.appendChild(form);
+                        form.submit();
+                    }
+                }
+            }
+            
+            sendButton.addEventListener('click', function(event) {
+                event.preventDefault();
+                sendMessage();
+            });
+            
+            messageInput.addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    sendMessage();
+                }
+            });
         };
     </script>
 </body>
