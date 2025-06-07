@@ -16,7 +16,8 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from passlib.context import CryptContext
-
+# form openai import AzureOpenAI
+# from dotenv import load_dotenv
 # Create FastAPI app
 app = FastAPI(title="Login API")
 
