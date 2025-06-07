@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Home Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: #4CAF50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: white;
+            border-radius: 5px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .welcome-message {
+            margin-bottom: 20px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .user-info {
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .logout-button {
+            background-color: #f44336;
+        }
+        .logout-button:hover {
+            background-color: #d32f2f;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Welcome to Your Dashboard</h1>
+    </div>
+    
+    <div class="container">
+        <div class="welcome-message">
+            <h2>Hello, {{ full_name if full_name else username }}!</h2>
+            <p>You have successfully logged in to your account.</p>
+        </div>
+        
+        <div class="user-info">
+            <h3>Your Account Information</h3>
+            <p><strong>Username:</strong> {{ username }}</p>
+            {% if full_name %}
+            <p><strong>Full Name:</strong> {{ full_name }}</p>
+            {% endif %}
+        </div>
+        
+        <div class="actions">
+            <a href="/user/me" class="button">View Profile</a>
+            <a href="/" class="button logout-button">Logout</a>
+        </div>
+    </div>
+</body>
+</html>
