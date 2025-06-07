@@ -54,13 +54,8 @@ def gemini_tool(messages,tool):
         message = response.choices[0].message
         
         # Check if the response contains tool calls
-        if message.tool_calls:
-            tool_call = message.tool_calls[0]  # Get the first tool call
-            if tool_call.function.name == "end":
-                print("Conversation ended by the assistant.")
-                return {"content": message.content, "tool_used": "end"}
         
-        return {"content": message.content, "tool_used": None}
+        return message
     except Exception as e:
         return {"content": str(e), "tool_used": None}
 
@@ -73,7 +68,7 @@ def gemini_structured(messages,structure):
         response_format=structure
         )
 
-        return response.choices[0].message.content
+        return response.choices[0].message.parsed
     except Exception as e:
         return e
 
@@ -118,8 +113,17 @@ class UserCreate(BaseModel):
 class ChatRequest(BaseModel):
     message: str
 
+class School(BaseModel):
+    school: str
+    rate: float
+    reason: str
+
+class RecommendList(BaseModel):
+    recommend_list: List[School]
+
 class ChatResponse(BaseModel):
     response: str
+    recommendation: Optional[RecommendList] = None
 
 # Authentication functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -308,13 +312,7 @@ UCSD CS 
  ▫ Access to San Diego tech industry and research centers
 """
 
-class School(BaseModel):
-    school: str
-    rate: float
-    reason: str
 
-class RecommendList(BaseModel):
-    recommend_list: List[School]
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
@@ -333,28 +331,34 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     # Here you would integrate with your AI model
     history = [{"role": "system", "content": agent1}]
     history.extend(session_dicts)
-    print(history)
-    ai_response = gemini_tool(history,stop_tool)
+    message = gemini_tool(history,stop_tool)
 
-    if ai_response["tool_used"] == "end":
-        conversation_history = [{"role": "system", "content": "based on the conversation,make a detailed report."}]
-        conversation_history.extend(session_dicts)
-        report = gemini_request(conversation_history)
+    if message.tool_calls:
+        tool_call = message.tool_calls[0]
+        tool_name = tool_call.function.name
 
-        recommendation = gemini_structured([{"role":"system","content":agent3},{"role":"system","content":""},{"role":"user","content":report}])
+        if tool_name == "end":
+            print("end")
+            conversation_history = [{"role": "system", "content": "turn the conversation into a complete report"}]
+            conversation_history.extend(session_dicts)
+            report = gemini_request(conversation_history)
+            print(report)
+
+        
+        recommendation = gemini_structured([{"role":"system","content":agent3},{"role":"system","content":data},{"role":"user","content":report}],RecommendList)
+        print(recommendation)
         return ChatResponse(response=report, recommendation=recommendation)
     
     else:
-        ai_response = ai_response["content"]
 
         # Add AI response to session
         ai_message = ChatMessage(
             role="assistant",
-            content=ai_response,
+            content=message.content,
         )
         chat_sessions[username].append(ai_message)
 
-        return ChatResponse(response=ai_response)
+        return ChatResponse(response=message.content)
 
 @app.get("/chat/history", response_model=List[ChatMessage])
 async def get_chat_history(current_user: User = Depends(get_current_user)):
