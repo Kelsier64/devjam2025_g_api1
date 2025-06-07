@@ -156,7 +156,7 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     )
     chat_sessions[username].append(ai_message)
     
-    return ChatResponse(response=ai_response)s
+    return ChatResponse(response=ai_response)
 
 @app.get("/chat/history", response_model=List[ChatMessage])
 async def get_chat_history(current_user: User = Depends(get_current_user)):
