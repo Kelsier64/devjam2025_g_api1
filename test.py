@@ -12,15 +12,16 @@ def gemini_request(messages):
     try:
         response = client.chat.completions.create(
         model="gemini-2.5-flash-preview-05-20",
-        messages=[messages]
+        messages=messages
         )
 
         return response.choices[0].message.content
     except Exception as e:
         return e
     
-reply = gemini_request({
-    "role": "user",
-    "content": "Hello,"
-})
+
+chat = [{"role":"system","content":"you are a agent"}]
+chat.extend([{"role":"assistant","content":"hi"}])
+print(chat)   
+reply = gemini_request(chat)
 print(reply)

@@ -44,6 +44,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+add_user("a", "a", "a")
+
 # JWT settings
 SECRET_KEY = "YourSecretKey"  # In production, use environment variable
 ALGORITHM = "HS256"
@@ -134,6 +136,8 @@ async def register_user(user_data: UserCreate):
     add_user(user_data.username, user_data.password, user_data.email)
     return {"message": "User registered successfully"}
 
+
+
 agent1 = """
 
 
@@ -150,8 +154,14 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     )
     chat_sessions[username].append(user_message)
     
+    # Convert ChatMessage objects to dictionary format for the API
+    session_dicts = [{"role": msg.role, "content": msg.content} for msg in chat_sessions[username]]
+    
     # Here you would integrate with your AI model
-    ai_response = gemini_request([{"role":"system","content":agent1}].extend(chat_sessions[username]))
+    history = [{"role": "system", "content": agent1}]
+    history.extend(session_dicts)
+    print(history)
+    ai_response = gemini_request(history)
 
     # Add AI response to session
     ai_message = ChatMessage(
