@@ -3,11 +3,13 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import uvicorn
 import os
 import sqlite3
+import secrets
 from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
@@ -15,6 +17,14 @@ from passlib.context import CryptContext
 
 # Create FastAPI app
 app = FastAPI(title="Login API")
+
+# Add session middleware
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=secrets.token_urlsafe(32),
+    session_cookie="fastapi_session",
+    max_age=3600,  # Session expiration time in seconds (1 hour)
+)
 
 # Set up templates directory
 templates_dir = os.path.join(os.path.dirname(__file__), "templates")
@@ -46,6 +56,11 @@ class User(BaseModel):
     email: Optional[str] = None
     full_name: Optional[str] = None
     disabled: Optional[bool] = None
+    
+class ChatMessage(BaseModel):
+    sender: str
+    content: str
+    timestamp: Optional[str] = None
 
 class UserInDB(User):
     hashed_password: str
@@ -97,10 +112,13 @@ def create_user(db: Session, user: UserCreate):
 # Routes
 @app.get("/")
 async def root(request: Request):
-    return {"message": "Welcome to the API"}
+    return templates.TemplateResponse(
+        "login.html",
+        {"request": request}
+    )
 
 @app.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     user = authenticate_user(db, form_data.username, form_data.password)
     if not user:
         raise HTTPException(
@@ -108,30 +126,74 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return {"access_token": user.username, "token_type": "bearer"}
+    
+    # Initialize session data
+    request.session["username"] = user.username
+    
+    # Return token for API use
+    response = RedirectResponse(url="/home", status_code=status.HTTP_303_SEE_OTHER)
+    return response
 
 @app.get("/chat")
 async def chat(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = get_user(db, token)
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    return {"messages":[]}
+    
+    # Initialize chat history in session if it doesn't exist
+    if "chat_history" not in request.session:
+        request.session["chat_history"] = []
+    
+    return templates.TemplateResponse(
+        "chat.html", 
+        {
+            "request": request,
+            "username": user.username,
+            "messages": request.session.get("chat_history", [])
+        }
+    )
 
 @app.post("/chat/upload")
-async def upload(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+async def upload(request: Request, message: str = Form(...), token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = get_user(db, token)
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
-    return {"message": "success"}
+    # Initialize chat history in session if it doesn't exist
+    if "chat_history" not in request.session:
+        request.session["chat_history"] = []
+    
+    # Create a new message and add it to chat history
+    from datetime import datetime
+    new_message = {
+        "sender": user.username,
+        "content": message,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    # Add message to session
+    chat_history = request.session.get("chat_history", [])
+    chat_history.append(new_message)
+    request.session["chat_history"] = chat_history
+    
+    # Redirect back to chat page
+    return RedirectResponse(url="/chat", status_code=status.HTTP_303_SEE_OTHER)
 
-@app.post("/recycle/comfirm")
-async def evaluate(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+@app.get("/home")
+async def home(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = get_user(db, token)
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
-    return {"message": "success"}
+    return templates.TemplateResponse(
+        "home.html", 
+        {
+            "request": request,
+            "username": user.username,
+            "full_name": user.full_name,
+            "email": user.email
+        }
+    )
 
 @app.get("/user/me")
 async def read_users_me(current_user: User = Depends(oauth2_scheme), db: Session = Depends(get_db)):
