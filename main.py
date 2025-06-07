@@ -135,6 +135,8 @@ async def register_user(user_data: UserCreate):
     add_user(user_data.username, user_data.password, user_data.email)
     return {"message": "User registered successfully"}
 
+agent1 = ""
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
     username = current_user.username
@@ -147,7 +149,7 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     chat_sessions[username].append(user_message)
     
     # Here you would integrate with your AI model
-    ai_response = gpt4o_request(chat_sessions[username])
+    ai_response = gpt4o_request([{"role":"system","content":agent1}].extend(chat_sessions[username]))
 
     # Add AI response to session
     ai_message = ChatMessage(
