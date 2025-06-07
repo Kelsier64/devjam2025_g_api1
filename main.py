@@ -26,7 +26,7 @@ def gemini_request(messages):
     try:
         response = client.chat.completions.create(
         model="gemini-2.5-flash-preview-05-20",
-        messages=[messages]
+        messages=messages
         )
 
         return response.choices[0].message.content
