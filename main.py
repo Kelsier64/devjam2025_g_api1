@@ -21,6 +21,14 @@ client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
+stop_tool = {
+    "type": "function",
+    "function": {
+      "name": "end",
+      "description": "End the conversation when collected sufficient information."
+      },
+    }
+
 def gemini_request(messages):
     """Send a request to the GPT-4o model and return the response content."""
     try:
@@ -31,7 +39,43 @@ def gemini_request(messages):
 
         return response.choices[0].message.content
     except Exception as e:
-        return f"gemini error:{e}"
+        return e
+
+def gemini_tool(messages,tool):
+    """Send a request to the GPT-4o model and return the response, handling tool calls."""
+    try:
+        response = client.chat.completions.create(
+            model="gemini-2.5-flash-preview-05-20",
+            messages=messages,
+            tools=[tool],
+            tool_choice="auto",  # Allow the model to choose when to use tools
+        )
+        
+        message = response.choices[0].message
+        
+        # Check if the response contains tool calls
+        if message.tool_calls:
+            tool_call = message.tool_calls[0]  # Get the first tool call
+            if tool_call.function.name == "end":
+                print("Conversation ended by the assistant.")
+                return {"content": message.content, "tool_used": "end"}
+        
+        return {"content": message.content, "tool_used": None}
+    except Exception as e:
+        return {"content": str(e), "tool_used": None}
+
+def gemini_structured(messages,structure):
+    """Send a request to the GPT-4o model and return the response content."""
+    try:
+        response = client.beta.chat.completions.parse(
+        model="gemini-2.5-flash-preview-05-20",
+        messages=messages,
+        response_format=structure
+        )
+
+        return response.choices[0].message.content
+    except Exception as e:
+        return e
 
 app = FastAPI(title="AI Chat API")
 
@@ -161,9 +205,116 @@ Behavioral guidelines:
 - If the student has limited experience, offer gentle encouragement and explain why the question is still useful.
 - You may switch between English and Traditional Chinese based on user input.
 
-When all fields are collected, make a report and . Never make up information. End the conversation when collected sufficient information.
+End the conversation when collected sufficient information.
 
 """
+
+
+agent2 = """
+
+"""
+
+agent3 = """
+You are the Ranking Agent in the school application system. Your job is to take as input:
+1. A structured student profile (including academic background, research experience, test scores, skills, preferences, etc.)
+2. A list of candidate graduate programs (each with key features such as university name, location, focus area, funding, and program highlights)
+
+Your task is to **evaluate and rank** the programs based on how well they align with the student’s qualifications, goals, and preferences.
+
+Your output should be a **ranked list** of the programs, each with:
+- A **match score** (0–10)
+- A **brief explanation** for the ranking (highlighting key factors like research fit, funding availability, reputation, region, etc.)
+
+ Guidelines:
+- Prioritize alignment with the student’s preferred focus area (e.g., NLP, machine learning, applied AI).
+- Consider academic competitiveness: exclude or down-rank programs clearly misaligned with the student’s GPA or research experience.
+- Factor in stated preferences (e.g., research vs. industry orientation, region, funding availability).
+- Avoid over-ranking a program solely based on reputation unless it matches the student’s goals.
+- Explain clearly why one program is ranked higher than another (e.g., “offers more research opportunities in NLP, which aligns with the student’s lab experience”).
+- If two programs are similarly matched, you may assign the same score but must still explain the logic.
+
+Do not invent or hallucinate features of the programs or the student. Use only the provided input.
+
+Conclude the output with a short summary paragraph offering general guidance to the student (e.g., “Consider applying to your top 3 matches, but also include a safety option based on competitiveness.”)
+"""
+
+data = """
+測試資料：
+NTU CS 
+ • University & Program: Nanyang Technological University, Computer Science (Bachelor/Master)
+ • Country/Region: Singapore
+ • Key Features:
+ ▫ Strong focus on practical software design and integration
+ ▫ Mandatory industrial attachment (internship)
+ ▫ Group innovation, design, and capstone projects
+ ▫ Scholarships and financial aid available
+ ▫ High graduate employment and salary rates
+ ▫ Research and industry alignment in AI, big data, cybersecurity, etc.
+ ▫ 4-year undergraduate program; graduate programs also available
+
+CMU MSAII ￼
+ • University & Program: Carnegie Mellon University, Master of Science in Artificial Intelligence and Innovation (MSAII)
+ • Country/Region: United States (Pittsburgh, PA)
+ • Key Features:
+ ▫ Focus on AI, machine learning, and innovation
+ ▫ Four-semester program with core curriculum, electives, and knowledge requirements
+ ▫ Required summer industry internship
+ ▫ Capstone project with real-world AI product development
+ ▫ Collaboration with business school and industry partners
+ ▫ Scholarships/fee waivers available for eligible students
+
+Stanford CS 
+ • University & Program: Stanford University, Computer Science (MS)
+ • Country/Region: United States (California)
+ • Key Features:
+ ▫ Flexible curriculum with specializations (AI, systems, HCI, etc.)
+ ▫ Research and project opportunities
+ ▫ Can be completed full-time (1–2 years) or part-time (3–5 years, US residents)
+ ▫ Some specializations available fully online (for US residents)
+ ▫ Access to world-class faculty and Silicon Valley network
+ ▫ Financial aid and scholarships available
+
+ UIUC CS 
+ • University & Program: University of Illinois Urbana-Champaign, Computer Science (BS/MS/MCS)
+ • Country/Region: United States (Illinois)
+ • Key Features:
+ ▫ Top-ranked, broad and deep curriculum
+ ▫ Multiple degree options (BS, MS, MCS, CS+X interdisciplinary programs)
+ ▫ Strong in systems, AI, data science, and software engineering
+ ▫ Research, internship, and entrepreneurship opportunities
+ ▫ Scholarships and guaranteed admission to online MCS for high-performing undergrads
+ ▫ Large, collaborative student community
+
+UCB CS 
+ • University & Program: University of California, Berkeley, Computer Science (BS/MS/PhD)
+ • Country/Region: United States (California)
+ • Key Features:
+ ▫ Renowned for research and innovation in CS
+ ▫ Flexible curriculum with strong theoretical and applied focus
+ ▫ Access to Silicon Valley and top tech companies
+ ▫ Research, internship, and entrepreneurship opportunities
+ ▫ Financial aid and scholarships available
+ ▫ Highly competitive admissions
+
+
+UCSD CS 
+ • University & Program: University of California, San Diego, Computer Science (BS/MS/PhD)
+ • Country/Region: United States (California)
+ • Key Features:
+ ▫ Strong in systems, AI, data science, and interdisciplinary research
+ ▫ Research and industry-aligned curriculum
+ ▫ Internship and project-based learning
+ ▫ Scholarships and financial aid available
+ ▫ Access to San Diego tech industry and research centers
+"""
+
+class School(BaseModel):
+    school: str
+    rate: float
+    reason: str
+
+class RecommendList(BaseModel):
+    recommend_list: List[School]
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
@@ -183,16 +334,27 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     history = [{"role": "system", "content": agent1}]
     history.extend(session_dicts)
     print(history)
-    ai_response = gemini_request(history)
+    ai_response = gemini_tool(history,stop_tool)
 
-    # Add AI response to session
-    ai_message = ChatMessage(
-        role="assistant",
-        content=ai_response,
-    )
-    chat_sessions[username].append(ai_message)
+    if ai_response["tool_used"] == "end":
+        conversation_history = [{"role": "system", "content": "based on the conversation,make a detailed report."}]
+        conversation_history.extend(session_dicts)
+        report = gemini_request(conversation_history)
+
+        recommendation = gemini_structured([{"role":"system","content":agent3},{"role":"system","content":""},{"role":"user","content":report}])
+        return ChatResponse(response=report, recommendation=recommendation)
     
-    return ChatResponse(response=ai_response)
+    else:
+        ai_response = ai_response["content"]
+
+        # Add AI response to session
+        ai_message = ChatMessage(
+            role="assistant",
+            content=ai_response,
+        )
+        chat_sessions[username].append(ai_message)
+
+        return ChatResponse(response=ai_response)
 
 @app.get("/chat/history", response_model=List[ChatMessage])
 async def get_chat_history(current_user: User = Depends(get_current_user)):

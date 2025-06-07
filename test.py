@@ -7,21 +7,38 @@ client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
-def gemini_request(messages):
-    """Send a request to the GPT-4o model and return the response content."""
+stop_tool = {
+    "type": "function",
+    "function": {
+      "name": "end",
+      "description": "End the conversation when collected sufficient information."
+      },
+    }
+
+def gemini_request(messages,tool):
+    """Send a request to the GPT-4o model and return the response, handling tool calls."""
     try:
         response = client.chat.completions.create(
-        model="gemini-2.5-flash-preview-05-20",
-        messages=messages
+            model="gemini-2.5-flash-preview-05-20",
+            messages=messages,
+            tools=[tool],
+            tool_choice="auto",  # Allow the model to choose when to use tools
         )
-
-        return response.choices[0].message.content
+        
+        message = response.choices[0].message
+        
+        # Check if the response contains tool calls
+        if message.tool_calls:
+            tool_call = message.tool_calls[0]  # Get the first tool call
+            if tool_call.function.name == "end":
+                print("Conversation ended by the assistant.")
+                return {"content": message.content, "tool_used": "end"}
+        
+        return {"content": message.content, "tool_used": None}
     except Exception as e:
-        return e
-    
+        return {"content": str(e), "tool_used": None}
 
-chat = [{"role":"system","content":"you are a agent"}]
-chat.extend([{"role":"assistant","content":"hi"}])
-print(chat)   
-reply = gemini_request(chat)
+
+
+reply = gemini_request([{"role": "user", "content": "end"}],stop_tool)
 print(reply)
