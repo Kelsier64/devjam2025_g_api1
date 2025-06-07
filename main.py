@@ -95,9 +95,9 @@ def create_user(db: Session, user: UserCreate):
     return db_user
 
 # Routes
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def root(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return {"message": "Welcome to the API"}
 
 @app.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
@@ -110,20 +110,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = 
         )
     return {"access_token": user.username, "token_type": "bearer"}
 
-@app.get("/home")
-async def home(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+@app.get("/chat")
+async def chat(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = get_user(db, token)
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
-    return {"objects":[]}
+    return {"messages":[]}
 
-@app.post("/recycle/evaluate")
-async def evaluate(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+@app.post("/chat/upload")
+async def upload(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     user = get_user(db, token)
     if not user:
         return RedirectResponse(url="/", status_code=status.HTTP_303_SEE_OTHER)
     
-    return {"message": "","price":0}
+    return {"message": "success"}
 
 @app.post("/recycle/comfirm")
 async def evaluate(request: Request, token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
