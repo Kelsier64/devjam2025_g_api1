@@ -29,7 +29,7 @@ def gemini_request(messages):
         messages=[messages]
         )
 
-        return response.choices[0].message
+        return response.choices[0].message.content
     except Exception as e:
         return e
 

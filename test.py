@@ -7,15 +7,20 @@ client = OpenAI(
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
-response = client.chat.completions.create(
-    model="gemini-2.5-flash-preview-05-20",
-    messages=[
-        {"role": "system", "content": "You are a helpful assistant."},
-        {
-            "role": "user",
-            "content": "hello"
-        }
-    ]
-)
+def gemini_request(messages):
+    """Send a request to the GPT-4o model and return the response content."""
+    try:
+        response = client.chat.completions.create(
+        model="gemini-2.5-flash-preview-05-20",
+        messages=[messages]
+        )
 
-print(response.choices[0].message)
+        return response.choices[0].message.content
+    except Exception as e:
+        return e
+    
+reply = gemini_request({
+    "role": "user",
+    "content": "Hello,"
+})
+print(reply)
