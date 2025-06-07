@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -12,8 +12,15 @@ from database import get_user_by_username, verify_password, add_user, get_db
 from openai import OpenAI
 from dotenv import load_dotenv
 import os
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
 
 load_dotenv(override=True)
+
+# Set up templates
+templates = Jinja2Templates(directory="templates")
 
 
 client = OpenAI(
@@ -124,6 +131,14 @@ class RecommendList(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     recommendation: Optional[RecommendList] = None
+
+class CalendarEvent(BaseModel):
+    school: str
+    date: datetime
+    event: str
+
+class Calendar(BaseModel):
+    events: List[CalendarEvent]
 
 # Authentication functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -242,77 +257,35 @@ Do not invent or hallucinate features of the programs or the student. Use only t
 Conclude the output with a short summary paragraph offering general guidance to the student (e.g., “Consider applying to your top 3 matches, but also include a safety option based on competitiveness.”)
 """
 
-data = """
-測試資料：
-NTU CS 
- • University & Program: Nanyang Technological University, Computer Science (Bachelor/Master)
- • Country/Region: Singapore
- • Key Features:
- ▫ Strong focus on practical software design and integration
- ▫ Mandatory industrial attachment (internship)
- ▫ Group innovation, design, and capstone projects
- ▫ Scholarships and financial aid available
- ▫ High graduate employment and salary rates
- ▫ Research and industry alignment in AI, big data, cybersecurity, etc.
- ▫ 4-year undergraduate program; graduate programs also available
-
-CMU MSAII ￼
- • University & Program: Carnegie Mellon University, Master of Science in Artificial Intelligence and Innovation (MSAII)
- • Country/Region: United States (Pittsburgh, PA)
- • Key Features:
- ▫ Focus on AI, machine learning, and innovation
- ▫ Four-semester program with core curriculum, electives, and knowledge requirements
- ▫ Required summer industry internship
- ▫ Capstone project with real-world AI product development
- ▫ Collaboration with business school and industry partners
- ▫ Scholarships/fee waivers available for eligible students
-
-Stanford CS 
- • University & Program: Stanford University, Computer Science (MS)
- • Country/Region: United States (California)
- • Key Features:
- ▫ Flexible curriculum with specializations (AI, systems, HCI, etc.)
- ▫ Research and project opportunities
- ▫ Can be completed full-time (1–2 years) or part-time (3–5 years, US residents)
- ▫ Some specializations available fully online (for US residents)
- ▫ Access to world-class faculty and Silicon Valley network
- ▫ Financial aid and scholarships available
-
- UIUC CS 
- • University & Program: University of Illinois Urbana-Champaign, Computer Science (BS/MS/MCS)
- • Country/Region: United States (Illinois)
- • Key Features:
- ▫ Top-ranked, broad and deep curriculum
- ▫ Multiple degree options (BS, MS, MCS, CS+X interdisciplinary programs)
- ▫ Strong in systems, AI, data science, and software engineering
- ▫ Research, internship, and entrepreneurship opportunities
- ▫ Scholarships and guaranteed admission to online MCS for high-performing undergrads
- ▫ Large, collaborative student community
-
-UCB CS 
- • University & Program: University of California, Berkeley, Computer Science (BS/MS/PhD)
- • Country/Region: United States (California)
- • Key Features:
- ▫ Renowned for research and innovation in CS
- ▫ Flexible curriculum with strong theoretical and applied focus
- ▫ Access to Silicon Valley and top tech companies
- ▫ Research, internship, and entrepreneurship opportunities
- ▫ Financial aid and scholarships available
- ▫ Highly competitive admissions
+school_list = [
+    {
+        "name": "NTU CS",
+        "detail": "Nanyang Technological University, Computer Science (Bachelor/Master), Singapore. Key Features: Strong focus on practical software design and integration; Mandatory industrial attachment (internship); Group innovation, design, and capstone projects; Scholarships and financial aid available; High graduate employment and salary rates; Research and industry alignment in AI, big data, cybersecurity, etc.; 4-year undergraduate program; graduate programs also available."
+    },
+    {
+        "name": "CMU MSAII",
+        "detail": "Carnegie Mellon University, Master of Science in Artificial Intelligence and Innovation (MSAII), United States (Pittsburgh, PA). Key Features: Focus on AI, machine learning, and innovation; Four-semester program with core curriculum, electives, and knowledge requirements; Required summer industry internship; Capstone project with real-world AI product development; Collaboration with business school and industry partners; Scholarships/fee waivers available for eligible students."
+    },
+    {
+        "name": "Stanford CS",
+        "detail": "Stanford University, Computer Science (MS), United States (California). Key Features: Flexible curriculum with specializations (AI, systems, HCI, etc.); Research and project opportunities; Can be completed full-time (1–2 years) or part-time (3–5 years, US residents); Some specializations available fully online (for US residents); Access to world-class faculty and Silicon Valley network; Financial aid and scholarships available."
+    },
+    {
+        "name": "UIUC CS",
+        "detail": "University of Illinois Urbana-Champaign, Computer Science (BS/MS/MCS), United States (Illinois). Key Features: Top-ranked, broad and deep curriculum; Multiple degree options (BS, MS, MCS, CS+X interdisciplinary programs); Strong in systems, AI, data science, and software engineering; Research, internship, and entrepreneurship opportunities; Scholarships and guaranteed admission to online MCS for high-performing undergrads; Large, collaborative student community."
+    },
+    {
+        "name": "UCB CS",
+        "detail": "University of California, Berkeley, Computer Science (BS/MS/PhD), United States (California). Key Features: Renowned for research and innovation in CS; Flexible curriculum with strong theoretical and applied focus; Access to Silicon Valley and top tech companies; Research, internship, and entrepreneurship opportunities; Financial aid and scholarships available; Highly competitive admissions."
+    },
+    {
+        "name": "UCSD CS",
+        "detail": "University of California, San Diego, Computer Science (BS/MS/PhD), United States (California). Key Features: Strong in systems, AI, data science, and interdisciplinary research; Research and industry-aligned curriculum; Internship and project-based learning; Scholarships and financial aid available; Access to San Diego tech industry and research centers."
+    }
+]
 
 
-UCSD CS 
- • University & Program: University of California, San Diego, Computer Science (BS/MS/PhD)
- • Country/Region: United States (California)
- • Key Features:
- ▫ Strong in systems, AI, data science, and interdisciplinary research
- ▫ Research and industry-aligned curriculum
- ▫ Internship and project-based learning
- ▫ Scholarships and financial aid available
- ▫ Access to San Diego tech industry and research centers
-"""
-
-
+# school_list = [{name}]
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
@@ -337,15 +310,15 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
         tool_call = message.tool_calls[0]
         tool_name = tool_call.function.name
 
-        if tool_name == "end":
-            print("end")
-            conversation_history = [{"role": "system", "content": "turn the conversation into a complete report"}]
-            conversation_history.extend(session_dicts)
-            report = gemini_request(conversation_history)
-            print(report)
+        
+        print("end")
+        conversation_history = [{"role": "system", "content": "turn the conversation into a complete report"}]
+        conversation_history.extend(session_dicts)
+        report = gemini_request(conversation_history)
+        print(report)
 
         
-        recommendation = gemini_structured([{"role":"system","content":agent3},{"role":"system","content":data},{"role":"user","content":report}],RecommendList)
+        recommendation = gemini_structured([{"role":"system","content":agent3},{"role":"system","content":school_list},{"role":"user","content":report}],RecommendList)
         print(recommendation)
         return ChatResponse(response=report, recommendation=recommendation)
     
@@ -360,17 +333,63 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
 
         return ChatResponse(response=message.content)
 
-@app.get("/chat/history", response_model=List[ChatMessage])
-async def get_chat_history(current_user: User = Depends(get_current_user)):
-    username = current_user.username
-    return chat_sessions.get(username, [])
 
-@app.delete("/chat/history")
-async def clear_chat_history(current_user: User = Depends(get_current_user)):
+@app.post("/check", response_model=Calendar)
+async def make_calendar(schools: List[str], current_user: User = Depends(get_current_user)):
+    """Add selected schools to user's calendar for tracking application deadlines"""
     username = current_user.username
-    chat_sessions[username] = []
-    return {"message": "Chat history cleared"}
+    
+    # Generate calendar events for the selected schools
+    calendar = gemini_structured(
+        [
+            {"role": "system", "content": "Generate application deadlines and events for these schools as a calendar. Include events like application deadlines, transcript submission dates, interview dates, etc."},
+            {"role": "user", "content": f"Schools: {', '.join(schools)}"}
+        ],
+        Calendar
+    )
+    
+    # Initialize user_calendars dictionary if it doesn't exist
+    if not hasattr(app, 'user_calendars'):
+        app.user_calendars = {}
+    
+    # Store the calendar for this user
+    app.user_calendars[username] = calendar
+    
+    return calendar
+
+@app.get("/calendar", response_class=HTMLResponse)
+async def get_calendar(request: Request, current_user: User = Depends(get_current_user)):
+    """Get the user's calendar page with selected schools"""
+    username = current_user.username
+    
+    # Initialize calendar data
+    calendar_data = []
+    if hasattr(app, 'user_calendars') and username in app.user_calendars:
+        calendar_data = app.user_calendars[username]
+    
+    # Return the calendar template with user's calendar data
+    return templates.TemplateResponse(
+        "calendar.html", 
+        {"request": request, "calendar": calendar_data}
+    )
+
+
+# Add these routes above the if __name__ block to serve HTML templates
+@app.get("/", response_class=HTMLResponse)
+async def get_index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+@app.get("/login", response_class=HTMLResponse)
+async def get_login(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/chat", response_class=HTMLResponse)
+async def get_chat(request: Request):
+    return templates.TemplateResponse("chat.html", {"request": request})
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8080)
+
+# Mount the static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")

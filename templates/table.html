@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>School Recommendations</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: #333;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .nav-button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .nav-button:hover {
+            background-color: #45a049;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .recommendation-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .recommendation-table th,
+        .recommendation-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .recommendation-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .recommendation-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .score {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .calendar-actions {
+            margin-top: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+        .button:hover {
+            background-color: #45a049;
+        }
+        .button.secondary {
+            background-color: #f2f2f2;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+        .button.secondary:hover {
+            background-color: #e0e0e0;
+        }
+        .report-container {
+            margin-bottom: 30px;
+            padding: 20px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+        .report-container h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        .checkbox-cell {
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>School Recommendations</h1>
+        <div class="nav-buttons">
+            <a href="/chat" class="nav-button">Back to Chat</a>
+            <button id="logout" class="nav-button">Logout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="report-container">
+            <h2>Your Profile Summary</h2>
+            <div id="user-report"></div>
+        </div>
+        
+        <h2>Recommended Schools</h2>
+        <table class="recommendation-table">
+            <thead>
+                <tr>
+                    <th>Select</th>
+                    <th>School</th>
+                    <th>Match Score</th>
+                    <th>Reason</th>
+                </tr>
+            </thead>
+            <tbody id="recommendations-tbody">
+                <!-- School recommendations will be inserted here -->
+            </tbody>
+        </table>
+        
+        <div class="calendar-actions">
+            <button id="view-calendar" class="button secondary">View Calendar</button>
+            <button id="add-to-calendar" class="button">Add Selected to Calendar</button>
+        </div>
+    </div>
+
+    <script>
+        // Check if token exists, if not redirect to login
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+        
+        // Elements
+        const userReportElement = document.getElementById('user-report');
+        const recommendationsTbody = document.getElementById('recommendations-tbody');
+        const addToCalendarButton = document.getElementById('add-to-calendar');
+        const viewCalendarButton = document.getElementById('view-calendar');
+        const logoutButton = document.getElementById('logout');
+        
+        // Get data from localStorage
+        const reportData = localStorage.getItem('userReport');
+        const recommendationsData = localStorage.getItem('recommendations');
+        
+        // Display user report
+        if (reportData) {
+            userReportElement.innerHTML = reportData.replace(/\n/g, '<br>');
+        } else {
+            userReportElement.innerHTML = '<p>No profile data available. Please complete the consultation chat first.</p>';
+        }
+        
+        // Display recommendations
+        if (recommendationsData) {
+            try {
+                const recommendations = JSON.parse(recommendationsData);
+                
+                if (recommendations && recommendations.recommend_list && recommendations.recommend_list.length > 0) {
+                    recommendations.recommend_list.forEach(school => {
+                        const row = document.createElement('tr');
+                        
+                        // Checkbox cell
+                        const checkboxCell = document.createElement('td');
+                        checkboxCell.className = 'checkbox-cell';
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.name = 'selected-schools';
+                        checkbox.value = school.school;
+                        checkbox.id = `school-${school.school}`;
+                        checkboxCell.appendChild(checkbox);
+                        
+                        // School name
+                        const nameCell = document.createElement('td');
+                        nameCell.textContent = school.school;
+                        
+                        // Score
+                        const scoreCell = document.createElement('td');
+                        scoreCell.innerHTML = `<span class="score">${school.rate.toFixed(1)}/10</span>`;
+                        
+                        // Reason
+                        const reasonCell = document.createElement('td');
+                        reasonCell.textContent = school.reason;
+                        
+                        row.appendChild(checkboxCell);
+                        row.appendChild(nameCell);
+                        row.appendChild(scoreCell);
+                        row.appendChild(reasonCell);
+                        
+                        recommendationsTbody.appendChild(row);
+                    });
+                } else {
+                    recommendationsTbody.innerHTML = '<tr><td colspan="4">No recommendations available</td></tr>';
+                }
+            } catch (error) {
+                console.error('Error parsing recommendations:', error);
+                recommendationsTbody.innerHTML = '<tr><td colspan="4">Error loading recommendations</td></tr>';
+            }
+        } else {
+            recommendationsTbody.innerHTML = '<tr><td colspan="4">No recommendations available. Please complete the consultation chat first.</td></tr>';
+        }
+        
+        // Add selected schools to calendar
+        addToCalendarButton.addEventListener('click', async () => {
+            const selectedSchools = Array.from(document.querySelectorAll('input[name="selected-schools"]:checked'))
+                .map(checkbox => checkbox.value);
+            
+            if (selectedSchools.length === 0) {
+                alert('Please select at least one school');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/check', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(selectedSchools)
+                });
+                
+                if (response.ok) {
+                    alert('Schools added to calendar successfully');
+                } else {
+                    alert('Failed to add schools to calendar');
+                }
+            } catch (error) {
+                console.error('Error adding schools to calendar:', error);
+                alert('Error adding schools to calendar');
+            }
+        });
+        
+        // View calendar
+        viewCalendarButton.addEventListener('click', () => {
+            window.location.href = '/calendar-view';
+        });
+        
+        // Logout
+        logoutButton.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('userReport');
+            localStorage.removeItem('recommendations');
+            window.location.href = '/login';
+        });
+    </script>
+</body>
+</html>

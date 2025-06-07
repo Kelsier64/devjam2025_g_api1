@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Application Calendar</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 {
+            margin: 0;
+            color: #333;
+        }
+        .nav-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        .nav-button {
+            padding: 8px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .nav-button:hover {
+            background-color: #45a049;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .calendar-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .calendar-table th,
+        .calendar-table td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        .calendar-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .calendar-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        .empty-calendar {
+            text-align: center;
+            margin: 40px 0;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Application Calendar</h1>
+        <div class="nav-buttons">
+            <a href="/table" class="nav-button">Back to Recommendations</a>
+            <a href="/chat" class="nav-button">Back to Chat</a>
+            <button id="logout" class="nav-button">Logout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <h2>Your Application Deadlines</h2>
+        <div id="calendar-container">
+            <div class="empty-calendar" id="empty-calendar">
+                <p>Loading calendar events...</p>
+            </div>
+            <table class="calendar-table" id="calendar-table" style="display:none;">
+                <thead>
+                    <tr>
+                        <th>School</th>
+                        <th>Date</th>
+                        <th>Event</th>
+                    </tr>
+                </thead>
+                <tbody id="calendar-tbody">
+                    <!-- Calendar events will be inserted here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // Check if token exists, if not redirect to login
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login';
+        }
+        
+        // Elements
+        const calendarTable = document.getElementById('calendar-table');
+        const calendarTbody = document.getElementById('calendar-tbody');
+        const emptyCalendar = document.getElementById('empty-calendar');
+        const logoutButton = document.getElementById('logout');
+        
+        // Load calendar events
+        window.addEventListener('DOMContentLoaded', loadCalendar);
+        
+        // Logout button
+        logoutButton.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            window.location.href = '/login';
+        });
+        
+        // Load calendar from API
+        async function loadCalendar() {
+            try {
+                const response = await fetch('/calendar', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const calendar = await response.json();
+                    
+                    if (calendar && calendar.events && calendar.events.length > 0) {
+                        // Sort events by date
+                        calendar.events.sort((a, b) => new Date(a.date) - new Date(b.date));
+                        
+                        // Display events
+                        calendar.events.forEach(event => {
+                            const row = document.createElement('tr');
+                            
+                            // School
+                            const schoolCell = document.createElement('td');
+                            schoolCell.textContent = event.school;
+                            
+                            // Date
+                            const dateCell = document.createElement('td');
+                            dateCell.textContent = new Date(event.date).toLocaleDateString();
+                            
+                            // Event
+                            const eventCell = document.createElement('td');
+                            eventCell.textContent = event.event;
+                            
+                            row.appendChild(schoolCell);
+                            row.appendChild(dateCell);
+                            row.appendChild(eventCell);
+                            
+                            calendarTbody.appendChild(row);
+                        });
+                        
+                        // Show table and hide empty message
+                        calendarTable.style.display = 'table';
+                        emptyCalendar.style.display = 'none';
+                    } else {
+                        emptyCalendar.innerHTML = '<p>No calendar events found. Add schools to your calendar from the recommendations page.</p>';
+                    }
+                } else {
+                    emptyCalendar.innerHTML = '<p>Error loading calendar. Please try again later.</p>';
+                }
+            } catch (error) {
+                console.error('Error loading calendar:', error);
+                emptyCalendar.innerHTML = '<p>Error loading calendar. Please try again later.</p>';
+            }
+        }
+    </script>
+</body>
+</html>
