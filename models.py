@@ -10,7 +10,5 @@ class User(BaseModel):
     created_at: Optional[datetime] = None
 
 class ChatMessage(BaseModel):
-    id: str
-    sender: str  # 'user' or 'ai'
+    role: str  # 'user' or 'assitant'
     content: str
-    timestamp: datetime

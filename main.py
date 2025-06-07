@@ -9,6 +9,30 @@ from jwt.exceptions import InvalidTokenError
 import uuid
 from models import User, ChatMessage
 from database import get_user_by_username, verify_password, add_user, get_db
+from openai import AzureOpenAI
+from dotenv import load_dotenv
+import os
+
+load_dotenv(override=True)
+API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
+RESOURCE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
+
+azure_client = AzureOpenAI(
+    api_key=API_KEY,
+    api_version="2024-09-01-preview",
+    azure_endpoint=RESOURCE_ENDPOINT
+)
+
+def gpt4o_request(messages):
+    """Send a request to the GPT-4o model and return the response content."""
+    try:
+        response = azure_client.chat.completions.create(
+            model="gpt4o",
+            messages=messages
+        )
+        return response.choices[0].message.content
+    except:
+        return "error"
 
 app = FastAPI(title="AI Chat API")
 
@@ -51,7 +75,6 @@ class ChatRequest(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
-    timestamp: datetime
 
 # Authentication functions
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
@@ -118,26 +141,22 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     
     # Add user message to session
     user_message = ChatMessage(
-        id=str(uuid.uuid4()),
-        sender="user",
+        role="user",
         content=chat_request.message,
-        timestamp=datetime.now()
     )
     chat_sessions[username].append(user_message)
     
     # Here you would integrate with your AI model
-    ai_response = "This is a placeholder for AI response. Replace with actual AI integration."
-    
+    ai_response = gpt4o_request(chat_sessions[username])
+
     # Add AI response to session
     ai_message = ChatMessage(
-        id=str(uuid.uuid4()),
-        sender="ai",
+        role="assistant",
         content=ai_response,
-        timestamp=datetime.now()
     )
     chat_sessions[username].append(ai_message)
     
-    return ChatResponse(response=ai_response, timestamp=ai_message.timestamp)
+    return ChatResponse(response=ai_response)s
 
 @app.get("/chat/history", response_model=List[ChatMessage])
 async def get_chat_history(current_user: User = Depends(get_current_user)):
