@@ -9,30 +9,29 @@ from jwt.exceptions import InvalidTokenError
 import uuid
 from models import User, ChatMessage
 from database import get_user_by_username, verify_password, add_user, get_db
-from openai import AzureOpenAI
+from openai import OpenAI
 from dotenv import load_dotenv
 import os
 
 load_dotenv(override=True)
-API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-RESOURCE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
 
-azure_client = AzureOpenAI(
-    api_key=API_KEY,
-    api_version="2024-09-01-preview",
-    azure_endpoint=RESOURCE_ENDPOINT
+
+client = OpenAI(
+    api_key=os.getenv("GEMINI_API_KEY"),
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
 )
 
-def gpt4o_request(messages):
+def gemini_request(messages):
     """Send a request to the GPT-4o model and return the response content."""
     try:
-        response = azure_client.chat.completions.create(
-            model="gpt4o",
-            messages=messages
+        response = client.chat.completions.create(
+        model="gemini-2.5-flash-preview-05-20",
+        messages=[messages]
         )
-        return response.choices[0].message.content
-    except:
-        return "error"
+
+        return response.choices[0].message
+    except Exception as e:
+        return e
 
 app = FastAPI(title="AI Chat API")
 
@@ -135,7 +134,10 @@ async def register_user(user_data: UserCreate):
     add_user(user_data.username, user_data.password, user_data.email)
     return {"message": "User registered successfully"}
 
-agent1 = ""
+agent1 = """
+
+
+"""
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(get_current_user)):
@@ -149,7 +151,7 @@ async def chat_with_ai(chat_request: ChatRequest, current_user: User = Depends(g
     chat_sessions[username].append(user_message)
     
     # Here you would integrate with your AI model
-    ai_response = gpt4o_request([{"role":"system","content":agent1}].extend(chat_sessions[username]))
+    ai_response = gemini_request([{"role":"system","content":agent1}].extend(chat_sessions[username]))
 
     # Add AI response to session
     ai_message = ChatMessage(
